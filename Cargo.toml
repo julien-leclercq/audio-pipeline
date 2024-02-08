@@ -5,3 +5,4 @@ members = ["crates/cli"]
 
 [workspace.dependencies]
 clap = { version = "4.5.0", features = ["derive"] }
+rusqlite = { version = "0.30.0", features = ["bundled"] }
