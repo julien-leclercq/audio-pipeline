@@ -1,4 +1,7 @@
 [workspace]
 
 resolver = "2"
-members = ["cli"]
+members = ["crates/cli"]
+
+[workspace.dependencies]
+clap = { version = "4.5.0", features = ["derive"] }
