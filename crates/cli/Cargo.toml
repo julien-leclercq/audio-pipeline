@@ -6,5 +6,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { workspace = true }
-rusqlite = { workspace = true }
+anyhow = "1.0.79"
+clap = { version = "4.5.0", features = ["derive"] }
+once_cell = { version = "1.19.0" }
+redact = "0.1.8"
+rusqlite = { version = "0.30.0", features = ["bundled"] }
+serde = "1.0.196"
+serde_json = "1.0.113"
+sqlx = { version = "0.7.3", features = ["sqlite"] }
+tokio = { version = "1.36.0", features = ["full"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+url = "2.5.0"
+uuid = { version = "1.7.0", features = ["v4"] }
+youtube = { path = "../youtube" }
