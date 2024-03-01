@@ -1,0 +1,8 @@
+CREATE TABLE pipelines (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    args TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL
+)

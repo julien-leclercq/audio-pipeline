@@ -1,30 +1,27 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-
 use anyhow::Context;
-use rusqlite::{self, OpenFlags};
+use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePool};
 
-pub use self::migrations::{create_migration_table, run_migrations};
+pub(crate) struct Config {
+    pub database_url: String,
+}
 
-// pub fn init(path: String) -> anyhow::Result<()> {
-//     let conn = rusqlite::Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_CREATE)
-//         .context("could not open sqlite connection")?;
-//     create_migration_table(&conn)?;
-//     run_migrations(&conn)?;
-//     Ok(())
-// }
+impl Config {
+    pub(crate) async fn connect_db(&self) -> anyhow::Result<SqlitePool> {
+        SqlitePool::connect(&self.database_url)
+            .await
+            .context("connect to sqlite from config")
+    }
+}
 
-pub(crate) mod migrations {
-    // use once_cell::sync::Lazy;
-    use rusqlite::Connection;
-
-    // pub static MIGRATIONS: Lazy<Vec<&str>> = Lazy::new(|| Vec::new());
-
-    pub fn create_migration_table(_conn: &Connection) -> anyhow::Result<()> {
-        todo!("cannot init database yet!")
+pub(crate) async fn init(config: Config) -> anyhow::Result<()> {
+    if !sqlx::Sqlite::database_exists(&config.database_url).await? {
+        sqlx::Sqlite::create_database(&config.database_url).await?;
     }
 
-    pub fn run_migrations(_conn: &Connection) -> anyhow::Result<()> {
-        todo!("cannot run migration yet!")
-    }
+    let sqlite_pool = config.connect_db().await?;
+
+    sqlx::migrate!()
+        .run(&sqlite_pool)
+        .await
+        .context("migrating database")
 }

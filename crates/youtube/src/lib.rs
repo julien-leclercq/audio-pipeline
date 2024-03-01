@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use anyhow::Context;
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::Value;
 use tracing::{instrument, Level};
 use url::Url;
 
@@ -13,15 +12,15 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(base_url: Url, authorization: redact::Secret<String>) -> Self {
+    pub fn new(base_url: &Url, authorization: &redact::Secret<String>) -> Self {
         Self {
-            base_url,
-            authorization,
+            base_url: base_url.clone(),
+            authorization: authorization.clone(),
         }
     }
 
     #[instrument(level = Level::DEBUG)]
-    pub fn get_channel_json_value(&self, id: String) -> Result<serde_json::Value, anyhow::Error> {
+    pub fn get_channel_json_value(&self, id: &str) -> Result<serde_json::Value, anyhow::Error> {
         self.get("channels")
             .query("forHandle", &id)
             .query("part", "contentDetails,snippet")
@@ -36,7 +35,7 @@ impl Client {
         &self,
         id: &String,
         page: &Option<String>,
-    ) -> Result<serde_json::Value, anyhow::Error> {
+    ) -> Result<PlaylistItemsListResponsePayload, anyhow::Error> {
         let req = self.get("playlistItems");
 
         let req = match page {
@@ -54,24 +53,18 @@ impl Client {
     }
 
     #[instrument(level = Level::DEBUG)]
-    pub fn get_videos(&self, ids: Vec<String>) -> Result<Vec<Video>, anyhow::Error> {
+    pub fn get_videos(&self, ids: &[String]) -> Result<Vec<Video>, anyhow::Error> {
         #[derive(Deserialize)]
         struct ResponsePayload {
             items: Vec<Video>,
         }
 
-        let video_as_json_value = self
-            .get("videos")
+        self.get("videos")
             .query("id", &ids.join(","))
             .query("part", "contentDetails,snippet")
             .call()
             .context("call to the youtube API")?
-            .into_json::<Value>()
-            .context("deserializing youtube API response")?;
-
-        dbg!(&video_as_json_value);
-
-        serde_json::from_value(video_as_json_value)
+            .into_json()
             .map(|list: ResponsePayload| list.items)
             .context("deserializing json value to video")
     }
@@ -94,12 +87,12 @@ impl Client {
 pub struct Video {
     pub id: String,
     #[serde(rename = "contentDetails")]
-    pub content_details: ContentDetails,
+    pub content_details: VideoContentDetails,
     pub snippet: VideoSnippet,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ContentDetails {
+pub struct VideoContentDetails {
     #[serde(deserialize_with = "deserialize_content_details_duration")]
     pub duration: Duration,
 }
@@ -108,6 +101,25 @@ pub struct ContentDetails {
 pub struct VideoSnippet {
     pub title: String,
     pub description: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PlaylistItemsListResponsePayload {
+    pub items: Vec<PlaylistItem>,
+    #[serde(rename = "nextPagetoken")]
+    pub next_page_token: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PlaylistItem {
+    #[serde(rename = "contentDetails")]
+    pub content_details: PlaylistItemContentDetails,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PlaylistItemContentDetails {
+    #[serde(rename = "videoId")]
+    pub video_id: String,
 }
 
 /// This is very custom and since youtube does not accept videos longer than 12 hours (anymore)

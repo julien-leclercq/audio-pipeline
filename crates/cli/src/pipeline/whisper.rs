@@ -1,11 +1,17 @@
+use serde::Serialize;
+use sqlx::SqlitePool;
 use std::process::Stdio;
+use time::OffsetDateTime;
 use tokio::{
     sync::mpsc::Receiver,
     task::{AbortHandle, JoinSet},
 };
 use tracing::info;
+use uuid::Uuid;
 
-#[derive(Clone, Debug)]
+use crate::models::{self, StepStatus};
+
+#[derive(Clone, Debug, Serialize)]
 pub(super) struct Arg {
     pub video_id: String,
     pub audio_path: String,
@@ -24,6 +30,8 @@ pub(super) async fn worker(
     audio_work_dir: &str,
     whisper_arg_rx: &mut Receiver<Arg>,
     config: Config,
+    pipeline_id: Uuid,
+    db: SqlitePool,
 ) -> () {
     tracing::info!("starting whisper worker");
 
@@ -40,7 +48,7 @@ pub(super) async fn worker(
 
                 tracing::info!(arg.video_id, arg.audio_path, "whisper worker video received");
 
-                spawn_whisper_task(arg, &mut js, config.clone()).await;
+                spawn_whisper_task(arg, &mut js, config.clone(), pipeline_id, db.clone()).await;
             },
 
             else => {
@@ -51,17 +59,40 @@ pub(super) async fn worker(
     }
 }
 
-async fn spawn_whisper_task(arg: Arg, js: &mut JoinSet<()>, config: Config) -> AbortHandle {
-    js.spawn(run_whisper(arg, config))
+async fn spawn_whisper_task(
+    arg: Arg,
+    js: &mut JoinSet<()>,
+    config: Config,
+    pipeline_id: Uuid,
+    db: SqlitePool,
+) -> AbortHandle {
+    js.spawn(run_whisper(arg, config, pipeline_id, db))
 }
 
-async fn run_whisper(arg: Arg, config: Config) {
+async fn run_whisper(arg: Arg, config: Config, pipeline_id: Uuid, db: SqlitePool) {
+    let now = OffsetDateTime::now_utc();
+
+    let step = models::Step {
+        id: Uuid::new_v4(),
+        pipeline_id: pipeline_id,
+        name: String::from("whisper"),
+        status: StepStatus::Queued,
+        arg: serde_json::to_string(&arg).expect("every arg should be serializable"),
+        state: "".into(),
+        created_at: now,
+        updated_at: now,
+        finished_at: None,
+    };
+
+    step.insert(&mut *db.acquire().await.expect("could not acquire db connection"))
+        .await
+        .expect("could not write to database");
     let whisper_output_dir = &whisper_output_dir(&config.work_dir, &arg.video_id);
 
     let child = tokio::process::Command::new("whisper")
         .stdin(Stdio::piped())
-        // .stdout(Stdio::piped())
-        // .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .args(["--verbose", "False"])
         .args(["--model", &config.model])
         .args(["--output_dir", whisper_output_dir])
@@ -86,6 +117,16 @@ async fn run_whisper(arg: Arg, config: Config) {
                 .expect("whisper sent unvalid utf8 to stderr (naughty command)"),
             "whisper task failed"
         );
+
+        let step = models::Step {
+            status: StepStatus::Error,
+            finished_at: Some(OffsetDateTime::now_utc()),
+            ..step
+        };
+
+        step.update(&mut *db.acquire().await.expect("could not acquire db connection"))
+            .await
+            .expect("could not write to database");
 
         return;
     }
