@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO pipelines (\n                id, kind, args, status, created_at, updated_at\n            )\n            VALUES (?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "3b87ceb89a0aaf9e441cd3dbaeadc6178245f718f627cd4c02ceb74e581dd2f4"
+}

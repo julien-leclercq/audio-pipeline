@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            UPDATE steps\n            SET pipeline_id = ?,\n                name = ?,\n                state = ?,\n                status = ?,\n                arg = ?,\n                created_at = ?,\n                updated_at =?,\n                finished_at = ?\n            WHERE\n                id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "140d4ddfa755b00763e9df3ed24348556653b8b200b380ec94132b83f144d46a"
+}

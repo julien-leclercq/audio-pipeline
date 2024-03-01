@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO steps (\n                id, pipeline_id, name, state, status, arg, created_at, updated_at\n            )\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 8
+    },
+    "nullable": []
+  },
+  "hash": "134c5e9137132d71d800397047c8ae699973140f7f64aaf199256a435bf4f17b"
+}
