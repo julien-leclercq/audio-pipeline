@@ -11,7 +11,7 @@ use crate::{
     youtube::{get_playlist_id, get_playlist_items, get_video_info},
 };
 
-#[tracing::instrument]
+#[tracing::instrument(skip(db, youtube_ids))]
 pub(crate) async fn video_info_worker(
     db: sqlx::SqlitePool,
     youtube_base_url: Url,
