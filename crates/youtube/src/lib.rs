@@ -128,9 +128,9 @@ fn deserialize_content_details_duration<'de, D>(deserializer: D) -> Result<Durat
 where
     D: Deserializer<'de>,
 {
-    let duration_str = dbg!(String::deserialize(deserializer)?);
+    let duration_str = String::deserialize(deserializer)?;
 
-    if !duration_str.starts_with("PT") {
+    if !duration_str.starts_with("P") {
         return Err(serde::de::Error::custom(
             "iso 8601 duration must start with 'PT'",
         ));
@@ -138,7 +138,27 @@ where
 
     let mut duration = Duration::default();
 
-    let duration_str = &duration_str[2..];
+    let duration_str = &duration_str[1..];
+
+    let duration_str = match (duration_str).split_once('D') {
+        None => &duration_str,
+        Some((days, duration_str)) => {
+            let days: u64 = dbg!(days.parse().map_err(serde::de::Error::custom)?);
+            duration += Duration::from_secs(days * 3600 * 24);
+            duration_str
+        }
+    };
+
+    if !duration_str.starts_with("T") {
+        if duration_str.is_empty() {
+            return Ok(duration);
+        }
+        return Err(serde::de::Error::custom(
+            "iso 8601 duration must start with 'PT'",
+        ));
+    }
+
+    let duration_str = &duration_str[1..];
 
     let duration_str = match (duration_str).split_once('H') {
         None => &duration_str,
