@@ -1,15 +1,17 @@
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use serde_json::json;
 use sqlx::types::time::OffsetDateTime;
-use tracing::{info, instrument};
+use tracing::info;
 use url::Url;
 use uuid::Uuid;
 use youtube::Client;
 
-pub use youtube::Video;
+use crate::{
+    models::{self, StepStatus},
+    youtube::{get_playlist_id, get_playlist_items, get_video_info},
+};
 
-use crate::models::{self, StepStatus};
-
+#[tracing::instrument]
 pub(crate) async fn video_info_worker(
     db: sqlx::SqlitePool,
     youtube_base_url: Url,
@@ -74,6 +76,20 @@ pub(crate) async fn video_info_worker(
             youtube_video
                 .insert(&mut *conn)
                 .await
+                .or_else(|root_err| {
+                    let err = root_err
+                        .downcast::<sqlx::Error>()
+                        .context("expected a sqlx error")?;
+
+                    match err {
+                        sqlx::Error::Database(database_err)
+                            if database_err.is_unique_violation() =>
+                        {
+                            Ok(())
+                        }
+                        err => Err(anyhow!(err)),
+                    }
+                })
                 .expect("insert youtube info to db");
         }
 
@@ -128,49 +144,4 @@ pub(crate) fn get_channel_video_ids(
     }
 
     Ok(res_video_ids)
-}
-
-#[instrument]
-pub(crate) fn get_playlist_id(
-    client: &youtube::Client,
-    youtube_channel_handle: &str,
-) -> anyhow::Result<String> {
-    let channel_info = client
-        .get_channel_json_value(youtube_channel_handle)
-        .context("fetching channel info")?;
-
-    let serde_json::Value::String(val) =
-        channel_info["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"].clone()
-    else {
-        anyhow::bail!("channel id should be a string {channel_info:?}")
-    };
-
-    Ok(val)
-}
-
-#[instrument]
-pub(crate) fn get_playlist_items(
-    client: &youtube::Client,
-    playlist_id: &String,
-    page: &Option<String>,
-) -> anyhow::Result<(Vec<String>, Option<String>)> {
-    let response = client.get_playlist_items(playlist_id, page)?;
-
-    let next_page_token = response.next_page_token;
-
-    let video_ids = response
-        .items
-        .into_iter()
-        .map(|playlist_item| playlist_item.content_details.video_id)
-        .collect();
-
-    Ok((video_ids, next_page_token))
-}
-
-#[instrument]
-pub(crate) fn get_video_info(
-    client: &youtube::Client,
-    video_ids: &[String],
-) -> anyhow::Result<Vec<Video>> {
-    client.get_videos(video_ids)
 }
