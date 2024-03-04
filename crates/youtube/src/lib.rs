@@ -106,7 +106,7 @@ pub struct VideoSnippet {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PlaylistItemsListResponsePayload {
     pub items: Vec<PlaylistItem>,
-    #[serde(rename = "nextPagetoken")]
+    #[serde(rename = "nextPageToken")]
     pub next_page_token: Option<String>,
 }
 
